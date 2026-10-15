@@ -131,7 +131,7 @@ contract RewardsBeam {
     // Notes:
     // - It is intended to rewrite the same values, emit the event, and reset the toc count, even if there is no change.
     // - A fresh beam is inert: maxVestTot defaults to 0, so governance must file the boundary before a
-    //   facilitator can do anything. vestTau defaults to 90 days, the value every spell has used.
+    //   facilitator can do anything.
     // - The facilitator sets one number: how much to stream. The duration is `vestTau`, which only governance can
     //   file, so the emission rate a facilitator can reach is bounded by maxVestTot / vestTau and both ends of that
     //   are governance-owned. Lowering `vestTot` is unbounded; at worst it starves the farm, which governance can
