@@ -23,8 +23,7 @@ interface VestedRewardsDistributionLike {
     function distribute() external returns (uint256);
 }
 
-interface DssVestTransferrableLike {
-    function cap() external view returns (uint256);
+interface DssVestLike {
     function unpaid(uint256) external view returns (uint256);
     function create(address, uint256, uint256, uint256, uint256, address) external returns (uint256);
     function restrict(uint256) external;
@@ -52,7 +51,7 @@ contract RewardsBeam {
     // --- immutables ---
 
     VestedRewardsDistributionLike public immutable dist;
-    DssVestTransferrableLike public immutable vest;
+    DssVestLike public immutable vest;
 
     // --- events ---
 
@@ -79,7 +78,7 @@ contract RewardsBeam {
 
     constructor(address _dist) {
         dist = VestedRewardsDistributionLike(_dist);
-        vest = DssVestTransferrableLike(dist.dssVest());
+        vest = DssVestLike(dist.dssVest());
         vestTau = 90 days;
         emit File("vestTau", 90 days);
 
@@ -148,18 +147,13 @@ contract RewardsBeam {
     //   The funding check that matters happens for free: the flush below moves real tokens, so `set()` reverts
     //   if the treasury cannot cover what is currently due. Keeping the stream payable from there on is
     //   governance's job, exactly as it is when the treasury balance runs low.
-    // - `vest.cap()` is an independent governance-owned rate ceiling that `vest.create` enforces anyway; it is
-    //   checked up front only so the failure mode is legible. The beam is deliberately not a `cap` filer:
-    //   raising it would affect every stream of the vest, not just this farm's.
     // - The farm's `rewardsDuration` is deliberately left out of the knobs: re-rating the notification window is
     //   a more structural decision, better routed through the full governance process.
     function set(uint256 vestTot) external toll {
         uint256 vestTau_ = vestTau;
 
         require(block.timestamp >= tau + toc, "RewardsBeam/too-early");
-        require(vestTot > 0, "RewardsBeam/vestTot-zero");
         require(vestTot <= maxVestTot, "RewardsBeam/vestTot-above-max");
-        require(vestTot / vestTau_ <= vest.cap(), "RewardsBeam/rate-above-vest-cap");
 
         toc = uint128(block.timestamp);
 

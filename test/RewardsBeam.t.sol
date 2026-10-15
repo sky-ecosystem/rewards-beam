@@ -206,7 +206,7 @@ contract RewardsBeamTest is Test {
     function testSetBoundaries() public {
         vm.startPrank(facilitator);
 
-        vm.expectRevert("RewardsBeam/vestTot-zero");
+        vm.expectRevert("DssVest/no-vest-total-amount");
         beam.set(0);
 
         vm.expectRevert("RewardsBeam/vestTot-above-max");
@@ -221,7 +221,7 @@ contract RewardsBeamTest is Test {
         beam.file("vestTau", 1);
         beam.file("maxVestTot", cap + 1);
         vm.prank(facilitator);
-        vm.expectRevert("RewardsBeam/rate-above-vest-cap");
+        vm.expectRevert("DssVest/rate-too-high");
         beam.set(cap + 1);
     }
 
