@@ -321,7 +321,7 @@ contract RewardsBeamTest is Test {
     function testSetRevertsWhenDistVestIdUnset() public {
         vm.mockCall(address(dist), abi.encodeWithSignature("vestId()"), abi.encode(uint256(0)));
         vm.prank(facilitator);
-        vm.expectRevert("RewardsBeam/dist-vest-id-not-set");
+        vm.expectRevert("DssVest/invalid-award");
         beam.set(1_000_000 ether);
         vm.clearMockedCalls();
     }

@@ -159,7 +159,6 @@ contract RewardsBeam {
         toc = uint128(block.timestamp);
 
         uint256 prevVestId = dist.vestId();
-        require(prevVestId != 0, "RewardsBeam/dist-vest-id-not-set");
 
         // Flush whatever the outgoing stream still owes the farm before retiring it.
         if (vest.unpaid(prevVestId) > 0) {
