@@ -293,7 +293,7 @@ contract RewardsBeamTest is Test {
         gem.transfer(rando, bal);
 
         vm.prank(facilitator);
-        vm.expectRevert();
+        vm.expectRevert("Sky/insufficient-balance");
         beam.set(60_000_000 ether);
     }
 
