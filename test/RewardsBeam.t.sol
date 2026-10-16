@@ -12,7 +12,6 @@ interface DssVestLike {
     function rely(address) external;
     function cap() external view returns (uint256);
     function czar() external view returns (address);
-    function ids() external view returns (uint256);
     function usr(uint256) external view returns (address);
     function bgn(uint256) external view returns (uint256);
     function clf(uint256) external view returns (uint256);
@@ -30,7 +29,6 @@ interface DistLike {
     function gem() external view returns (address);
     function stakingRewards() external view returns (address);
     function vestId() external view returns (uint256);
-    function lastDistributedAt() external view returns (uint256);
 }
 
 interface FarmLike {
@@ -66,7 +64,9 @@ contract RewardsBeamTest is Test {
     uint256 constant COOLDOWN = 7 days;
 
     event Rely(address indexed usr);
+    event Deny(address indexed usr);
     event Kiss(address indexed usr);
+    event Diss(address indexed usr);
     event File(bytes32 indexed what, uint256 data);
     event Set(uint256 indexed prevVestId, uint256 indexed vestId, uint256 vestTot, uint256 vestTau);
 
@@ -109,11 +109,17 @@ contract RewardsBeamTest is Test {
 
     // --- deployment ---
 
-    function testConstructor() public view {
-        assertEq(address(beam.dist()), address(dist));
-        assertEq(address(beam.vest()), address(vest));
-        assertEq(beam.vestTau(), VEST_TAU);
-        assertEq(beam.wards(address(this)), 1);
+    function testConstructor() public {
+        vm.expectEmit();
+        emit File("vestTau", VEST_TAU);
+        vm.expectEmit();
+        emit Rely(address(this));
+        RewardsBeam beam2 = new RewardsBeam(address(dist));
+
+        assertEq(address(beam2.dist()), address(dist));
+        assertEq(address(beam2.vest()), address(vest));
+        assertEq(beam2.vestTau(), VEST_TAU);
+        assertEq(beam2.wards(address(this)), 1);
     }
 
     function testFreshBeamIsInert() public {
@@ -136,6 +142,7 @@ contract RewardsBeamTest is Test {
         emit Rely(rando);
         beam.rely(rando);
         assertEq(beam.wards(rando), 1);
+        emit Deny(rando);
         beam.deny(rando);
         assertEq(beam.wards(rando), 0);
     }
@@ -145,6 +152,7 @@ contract RewardsBeamTest is Test {
         emit Kiss(rando);
         beam.kiss(rando);
         assertEq(beam.buds(rando), 1);
+        emit Diss(rando);
         beam.diss(rando);
         assertEq(beam.buds(rando), 0);
     }
@@ -193,12 +201,16 @@ contract RewardsBeamTest is Test {
 
         vm.expectRevert("RewardsBeam/invalid-tau-value");
         beam.file("tau", uint256(type(uint64).max) + 1);
+        beam.file("tau", uint256(type(uint64).max));
+        assertEq(beam.tau(), type(uint64).max);
 
         vm.expectRevert("RewardsBeam/invalid-toc-value");
         beam.file("toc", uint256(type(uint128).max) + 1);
+        beam.file("toc", uint256(type(uint128).max));
+        assertEq(beam.toc(), type(uint128).max);
 
         vm.expectRevert("RewardsBeam/file-unrecognized-param");
-        beam.file("nope", 1);
+        beam.file("random", 1);
     }
 
     // --- set: boundaries ---
