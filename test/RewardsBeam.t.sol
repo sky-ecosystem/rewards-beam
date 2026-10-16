@@ -107,8 +107,7 @@ contract RewardsBeamTest is Test {
         beam = RewardsBeam(_deployAndInit(0));
 
         // Let the test contract act as governance on the beam directly.
-        vm.prank(pauseProxy);
-        beam.rely(address(this));
+        vm.prank(pauseProxy); beam.rely(address(this));
     }
 
     // --- deployment ---
@@ -331,8 +330,7 @@ contract RewardsBeamTest is Test {
         // Leave just enough allowance for the outgoing flush and nothing more. `DssVest` draws `unpaid`
         // progressively, so creating a far larger stream is legitimate; governance tops up as it goes.
         uint256 pending = vest.unpaid(dist.vestId());
-        vm.prank(pauseProxy);
-        gem.approve(address(vest), pending);
+        vm.prank(pauseProxy); gem.approve(address(vest), pending);
 
         vm.prank(facilitator);
         beam.set(60_000_000 ether);
@@ -344,8 +342,7 @@ contract RewardsBeamTest is Test {
     function testSetRevertsWhenTreasuryCannotCoverTheFlush() public {
         // The flush moves real tokens, so an unfunded treasury stops `set()` without any explicit check.
         uint256 bal = gem.balanceOf(pauseProxy);
-        vm.prank(pauseProxy);
-        gem.transfer(rando, bal);
+        vm.prank(pauseProxy); gem.transfer(rando, bal);
 
         vm.prank(facilitator);
         vm.expectRevert("Sky/insufficient-balance");
@@ -406,6 +403,23 @@ contract RewardsBeamTest is Test {
         assertEq(farm.rewardsDuration(), 7 days);
     }
 
+    function testSetSkipsFlushWhenNothingIsUnpaid() public {
+        dist.distribute();
+        uint256 prevId = dist.vestId();
+        assertEq(vest.unpaid(prevId), 0);
+        uint256 farmBalBefore = gem.balanceOf(address(farm));
+        uint256 periodFinishBefore = farm.periodFinish();
+
+        vm.prank(facilitator);
+        beam.set(60_000_000 ether);
+
+        // No flush: nothing moved and the farm was not re-notified, yet the rollover went through.
+        assertEq(gem.balanceOf(address(farm)), farmBalBefore);
+        assertEq(farm.periodFinish(), periodFinishBefore);
+        assertFalse(vest.valid(prevId));
+        assertEq(vest.tot(dist.vestId()), 60_000_000 ether);
+    }
+
     function testSetPinsBgnToNowAndNeverFrontloads() public {
         uint256 farmBalBefore = gem.balanceOf(address(farm));
         uint256 pending = vest.unpaid(dist.vestId());
@@ -423,8 +437,7 @@ contract RewardsBeamTest is Test {
     }
 
     function testSetLowersTheEmissionRate() public {
-        vm.prank(pauseProxy);
-        gem.approve(address(vest), 200_000_000 ether);
+        vm.prank(pauseProxy); gem.approve(address(vest), 200_000_000 ether);
         deal(address(gem), pauseProxy, 200_000_000 ether);
 
         vm.prank(facilitator);
@@ -441,8 +454,7 @@ contract RewardsBeamTest is Test {
     }
 
     function testSetFuzzBoundedParams(uint256 vestTot, uint256 vestTau) public {
-        vm.prank(pauseProxy);
-        gem.approve(address(vest), MAX_VEST_TOT * 2);
+        vm.prank(pauseProxy); gem.approve(address(vest), MAX_VEST_TOT * 2);
 
         vestTau = bound(vestTau, 7 days, 365 days);
         beam.file("vestTau", vestTau);
