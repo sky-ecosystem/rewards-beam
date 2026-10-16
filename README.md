@@ -25,7 +25,7 @@ created, so no distribution follows — the distribution job picks it up from he
 Governance `file`s each knob. A freshly deployed beam is **inert**: `maxVestTot` defaults to `0`, so
 nothing can be executed until governance files it.
 
-| Param        | Unit    | Bounds                                                     |
+| Param        | Unit    | Description                                                |
 | ------------ | ------- | ---------------------------------------------------------- |
 | `maxVestTot` | wad     | max total of a new stream                                   |
 | `vestTau`    | s       | duration of a new stream; must be non-zero, defaults to `90 days` |
@@ -54,8 +54,6 @@ real tokens, so the call reverts if the treasury cannot cover what is currently 
 stream payable from there on is governance's job, exactly as it is when the balance runs low. The
 beam's own boundary is `maxVestTot`.
 
-`vest.cap()` is a second, independent governance-owned rate ceiling that `vest.create` enforces
-anyway; the beam checks it up front only so the failure mode is legible. The beam is deliberately not
-a `cap` filer — raising `cap` would affect every stream of the vest, not just this farm's.
+`vest.cap()` is a second, independent governance-owned rate ceiling that `vest.create` enforces. The beam is deliberately not a `cap` filer — raising `cap` would affect every stream of the vest, not just this farm's.
 
 The farm's `rewardsDuration` is deliberately out of scope: re-rating the notification window is a structural decision for the full governance process.

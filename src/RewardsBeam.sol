@@ -129,7 +129,8 @@ contract RewardsBeam {
     // --- execution ---
 
     // Notes:
-    // - It is intended to rewrite the same values, emit the event, and reset the toc count, even if there is no change.
+    // - It is intended to rewrite the same values, emit the event, and reset the toc count, even if `vestTot` is
+    //   unchanged: the stream will restart for a new `vestTau` period.
     // - A fresh beam is inert: maxVestTot defaults to 0, so governance must file the boundary before a
     //   facilitator can do anything.
     // - The facilitator sets one number: how much to stream. The duration is `vestTau`, which only governance can
