@@ -29,6 +29,7 @@ interface DistLike {
     function gem() external view returns (address);
     function stakingRewards() external view returns (address);
     function vestId() external view returns (uint256);
+    function distribute() external returns (uint256);
 }
 
 interface FarmLike {
@@ -366,23 +367,22 @@ contract RewardsBeamTest is Test {
         assertEq(gem.balanceOf(address(farm)) - farmBalBefore, pending);
     }
 
-    function testSetTwiceLowersTheEmissionRate() public {
+    function testSetLowersTheEmissionRate() public {
         vm.prank(pauseProxy);
         gem.approve(address(vest), 200_000_000 ether);
         deal(address(gem), pauseProxy, 200_000_000 ether);
 
         vm.prank(facilitator);
         beam.set(90_000_000 ether);
-        vm.warp(block.timestamp + COOLDOWN);
-        uint256 rateBefore = farm.rewardRate();
+        vm.warp(block.timestamp + 7 days);
+        dist.distribute();
+        assertApproxEqAbs(farm.rewardRate(), 90_000_000 ether / VEST_TAU, 1e6);
 
         vm.prank(facilitator);
         beam.set(9_000_000 ether);
-        vm.warp(block.timestamp + COOLDOWN);
-
-        vm.prank(facilitator);
-        beam.set(9_000_000 ether);
-        assertLt(farm.rewardRate(), rateBefore);
+        vm.warp(block.timestamp + 7 days);
+        dist.distribute();
+        assertApproxEqAbs(farm.rewardRate(), 9_000_000 ether / VEST_TAU, 1e6);
     }
 
     function testSetFuzzBoundedParams(uint256 vestTot, uint256 vestTau) public {
