@@ -2,10 +2,17 @@
 pragma solidity ^0.8.21;
 
 import {Test} from "forge-std/Test.sol";
+import {MCD} from "dss-test/MCD.sol";
 import {RewardsBeam} from "../src/RewardsBeam.sol";
+import {RewardsBeamDeploy} from "../deploy/RewardsBeamDeploy.sol";
+import {RewardsBeamInit, RewardsBeamConfig} from "../deploy/RewardsBeamInit.sol";
 
 interface ChainlogLike {
     function getAddress(bytes32) external view returns (address);
+}
+
+interface WardsLike {
+    function wards(address) external view returns (uint256);
 }
 
 interface DssVestLike {
@@ -57,6 +64,7 @@ contract RewardsBeamTest is Test {
     address pauseProxy;
     RewardsBeam beam;
 
+    address constant DEPLOYER = address(0xDE9);
     address facilitator = address(0xFAC1);
     address rando = address(0xDEAD);
 
@@ -95,17 +103,12 @@ contract RewardsBeamTest is Test {
         assertEq(vest.czar(), pauseProxy);
         assertEq(farm.rewardsDistribution(), address(dist));
 
-        beam = new RewardsBeam(address(dist));
+        // Leave the treasury allowance as deployed; tests that need more set it themselves.
+        beam = RewardsBeam(_deployAndInit(0));
 
-        // What the governance spell would do.
-        vm.startPrank(pauseProxy);
-        vest.rely(address(beam));
-        dist.rely(address(beam));
-        vm.stopPrank();
-
-        beam.file("maxVestTot", MAX_VEST_TOT);
-        beam.file("tau", COOLDOWN);
-        beam.kiss(facilitator);
+        // Let the test contract act as governance on the beam directly.
+        vm.prank(pauseProxy);
+        beam.rely(address(this));
     }
 
     // --- deployment ---
@@ -115,12 +118,62 @@ contract RewardsBeamTest is Test {
         emit File("vestTau", VEST_TAU);
         vm.expectEmit();
         emit Rely(address(this));
-        RewardsBeam beam2 = new RewardsBeam(address(dist));
+        RewardsBeam beam_ = new RewardsBeam(address(dist));
 
-        assertEq(address(beam2.dist()), address(dist));
-        assertEq(address(beam2.vest()), address(vest));
-        assertEq(beam2.vestTau(), VEST_TAU);
-        assertEq(beam2.wards(address(this)), 1);
+        assertEq(address(beam_.dist()), address(dist));
+        assertEq(address(beam_.vest()), address(vest));
+        assertEq(beam_.vestTau(), VEST_TAU);
+        assertEq(beam_.wards(address(this)), 1);
+    }
+
+    function _deployAndInit(uint256 allowance) internal returns (address beam_) {
+        vm.startPrank(DEPLOYER);
+        beam_ = RewardsBeamDeploy.deploy(DEPLOYER, pauseProxy, address(dist));
+        vm.stopPrank();
+
+        RewardsBeamConfig memory cfg = RewardsBeamConfig({
+            dist:        address(dist),
+            facilitator: facilitator,
+            maxVestTot:  MAX_VEST_TOT,
+            vestTau:     VEST_TAU,
+            tau:         COOLDOWN,
+            allowance:   allowance,
+            key:         "REWARDS_BEAM_LSSKY_SKY"
+        });
+        vm.startPrank(pauseProxy);
+        RewardsBeamInit.init(MCD.loadFromChainlog(address(chainlog)), beam_, cfg);
+        vm.stopPrank();
+
+        assertEq(RewardsBeam(beam_).wards(DEPLOYER), 0);
+        assertEq(RewardsBeam(beam_).wards(pauseProxy), 1);
+        assertEq(WardsLike(address(vest)).wards(beam_), 1);
+        assertEq(WardsLike(address(dist)).wards(beam_), 1);
+        assertEq(RewardsBeam(beam_).maxVestTot(), MAX_VEST_TOT);
+        assertEq(RewardsBeam(beam_).vestTau(), VEST_TAU);
+        assertEq(RewardsBeam(beam_).tau(), COOLDOWN);
+        assertEq(RewardsBeam(beam_).buds(facilitator), 1);
+        assertEq(chainlog.getAddress("REWARDS_BEAM_LSSKY_SKY"), beam_);
+    }
+
+    function testDeployAndInit() public {
+        address beam_ = _deployAndInit(300_000_000 ether);
+        assertEq(gem.allowance(pauseProxy, address(vest)), 300_000_000 ether);
+
+        // The initialized beam is live.
+        vm.prank(facilitator);
+        RewardsBeam(beam_).set(10_000_000 ether);
+        assertEq(vest.tot(dist.vestId()), 10_000_000 ether);
+    }
+
+    function testDeployAndInitZeroAllowanceLeavesItUntouched() public {
+        uint256 allowanceBefore = gem.allowance(pauseProxy, address(vest));
+        _deployAndInit(0);
+        assertEq(gem.allowance(pauseProxy, address(vest)), allowanceBefore);
+    }
+
+    function testDeployAndInitMaxAllowance() public {
+        _deployAndInit(type(uint256).max);
+        assertEq(gem.allowance(pauseProxy, address(vest)), type(uint256).max);
     }
 
     function testFreshBeamIsInert() public {
