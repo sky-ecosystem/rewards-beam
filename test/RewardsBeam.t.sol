@@ -139,20 +139,22 @@ contract RewardsBeamTest is Test {
     // --- administration ---
 
     function testRelyDeny() public {
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit();
         emit Rely(rando);
         beam.rely(rando);
         assertEq(beam.wards(rando), 1);
+        vm.expectEmit();
         emit Deny(rando);
         beam.deny(rando);
         assertEq(beam.wards(rando), 0);
     }
 
     function testKissDiss() public {
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit();
         emit Kiss(rando);
         beam.kiss(rando);
         assertEq(beam.buds(rando), 1);
+        vm.expectEmit();
         emit Diss(rando);
         beam.diss(rando);
         assertEq(beam.buds(rando), 0);
@@ -182,7 +184,7 @@ contract RewardsBeamTest is Test {
     // --- file ---
 
     function testFile() public {
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit();
         emit File("maxVestTot", 1);
         beam.file("maxVestTot", 1);
         assertEq(beam.maxVestTot(), 1);
@@ -323,7 +325,7 @@ contract RewardsBeamTest is Test {
         uint256 allowanceBefore = gem.allowance(pauseProxy, address(vest));
         uint256 newVestTot = 60_000_000 ether;
 
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit();
         emit Set(prevId, prevId + 1, newVestTot, VEST_TAU);
         vm.prank(facilitator);
         beam.set(newVestTot);
