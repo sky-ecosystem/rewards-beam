@@ -16,6 +16,7 @@ interface WardsLike {
 }
 
 interface DssVestLike {
+    function TWENTY_YEARS() external view returns (uint256);
     function rely(address) external;
     function cap() external view returns (uint256);
     function czar() external view returns (address);
@@ -250,9 +251,15 @@ contract RewardsBeamTest is Test {
     }
 
     function testFileBounds() public {
-        vm.expectRevert("RewardsBeam/vestTau-zero");
+        uint256 twentyYears = vest.TWENTY_YEARS();
+        vm.expectRevert("RewardsBeam/vestTau-out-of-boundaries");
         beam.file("vestTau", 0);
-        beam.file("vestTau", 1 days);
+        vm.expectRevert("RewardsBeam/vestTau-out-of-boundaries");
+        beam.file("vestTau", twentyYears + 1);
+        beam.file("vestTau", 1);
+        assertEq(beam.vestTau(), 1);
+        beam.file("vestTau", twentyYears);
+        assertEq(beam.vestTau(), twentyYears);
 
         vm.expectRevert("RewardsBeam/invalid-tau-value");
         beam.file("tau", uint256(type(uint64).max) + 1);

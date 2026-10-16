@@ -24,6 +24,7 @@ interface VestedRewardsDistributionLike {
 }
 
 interface DssVestLike {
+    function TWENTY_YEARS() external view returns (uint256);
     function unpaid(uint256) external view returns (uint256);
     function create(address, uint256, uint256, uint256, uint256, address) external returns (uint256);
     function restrict(uint256) external;
@@ -112,7 +113,7 @@ contract RewardsBeam {
         if (what == "maxVestTot") {
             maxVestTot = data;
         } else if (what == "vestTau") {
-            require(data > 0, "RewardsBeam/vestTau-zero");
+            require(data > 0 && data <= vest.TWENTY_YEARS(), "RewardsBeam/vestTau-out-of-boundaries");
             vestTau = data;
         } else if (what == "tau") {
             require(data <= type(uint64).max, "RewardsBeam/invalid-tau-value");
