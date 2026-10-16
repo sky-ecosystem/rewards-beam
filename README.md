@@ -57,3 +57,13 @@ beam's own boundary is `maxVestTot`.
 `vest.cap()` is a second, independent governance-owned rate ceiling that `vest.create` enforces. The beam is deliberately not a `cap` filer — raising `cap` would affect every stream of the vest, not just this farm's.
 
 The farm's `rewardsDuration` is deliberately out of scope: re-rating the notification window is a structural decision for the full governance process.
+
+## Stopping the stream
+
+A governance `yank` of the current stream does not, by itself, stop the beam: the next `set()` would
+create a fresh stream and reactivate the farm. When governance retires the stream, it should disable
+the beam in the same spell, by any of:
+
+- `diss` the facilitator, so no one can call `set()`;
+- `file("maxVestTot", 0)`, so no non-zero stream fits (and `vest.create` rejects a zero one);
+- `deny` the beam on `vest` or on `dist`, so the rollover reverts.
