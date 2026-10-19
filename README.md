@@ -17,11 +17,8 @@ One call performs the whole rollover atomically:
 3. create the replacement stream, beginning now, and restrict it (`vest.create` + `vest.restrict`),
 4. point the distribution contract at it (`dist.file("vestId", …)`).
 
-The new stream's `bgn` is hardcoded to `block.timestamp`, which is what every spell that ran this
-routine used. That leaves a facilitator no way to shift emissions in time: a `bgn` in the past would
-make part of the stream claimable on creation and drop it into the farm at once, and a `bgn` in the
-future would stall emissions until it arrived. It also means nothing has accrued when the stream is
-created, so no distribution follows — the distribution job picks it up from here.
+Stakers do not see a rate jump: the farm blends each distribution with what is left of its current
+period, so its reward rate eases toward the new stream's over roughly one `rewardsDuration`.
 
 ## Boundaries
 
