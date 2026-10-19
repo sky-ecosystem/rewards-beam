@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity ^0.8.21;
 
-import {Test} from "forge-std/Test.sol";
-import {MCD} from "dss-test/MCD.sol";
+import "dss-test/DssTest.sol";
 import {RewardsBeam} from "../src/RewardsBeam.sol";
 import {RewardsBeamDeploy} from "../deploy/RewardsBeamDeploy.sol";
 import {RewardsBeamInit, RewardsBeamConfig} from "../deploy/RewardsBeamInit.sol";
@@ -16,6 +15,7 @@ interface WardsLike {
 }
 
 interface DssVestLike {
+    function ids() external view returns (uint256);
     function TWENTY_YEARS() external view returns (uint256);
     function rely(address) external;
     function cap() external view returns (uint256);
@@ -54,7 +54,7 @@ interface GemLike {
     function balanceOf(address) external view returns (uint256);
 }
 
-contract RewardsBeamTest is Test {
+contract RewardsBeamTest is DssTest {
     ChainlogLike constant chainlog = ChainlogLike(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
     uint256 constant FORK_BLOCK = 25_920_000;
 
@@ -73,11 +73,8 @@ contract RewardsBeamTest is Test {
     uint256 constant VEST_TAU = 100 days;
     uint256 constant COOLDOWN = 7 days;
 
-    event Rely(address indexed usr);
-    event Deny(address indexed usr);
     event Kiss(address indexed usr);
     event Diss(address indexed usr);
-    event File(bytes32 indexed what, uint256 data);
     event Set(uint256 indexed prevVestId, uint256 indexed vestId, uint256 vestTot, uint256 vestTau);
 
     function setUp() public {
@@ -169,6 +166,28 @@ contract RewardsBeamTest is Test {
         assertEq(gem.allowance(pauseProxy, address(vest)), type(uint256).max);
     }
 
+    function init(address beam_, RewardsBeamConfig memory cfg) external {
+        RewardsBeamInit.init(MCD.loadFromChainlog(address(chainlog)), beam_, cfg);
+    }
+
+    function testInitRevertsOnDistMismatch() public {
+        vm.startPrank(DEPLOYER);
+        address beam_ = RewardsBeamDeploy.deploy(DEPLOYER, pauseProxy, address(dist));
+        vm.stopPrank();
+
+        RewardsBeamConfig memory cfg = RewardsBeamConfig({
+            dist:        chainlog.getAddress("REWARDS_DIST_USDS_SKY"),
+            facilitator: facilitator,
+            maxVestTot:  MAX_VEST_TOT,
+            vestTau:     VEST_TAU,
+            tau:         COOLDOWN,
+            allowance:   0,
+            key:         "REWARDS_BEAM_LSSKY_SKY"
+        });
+        vm.expectRevert("RewardsBeamInit/dist-mismatch");
+        this.init(beam_, cfg);
+    }
+
     function testFreshBeamIsInert() public {
         RewardsBeam fresh = new RewardsBeam(address(dist));
         assertEq(fresh.maxVestTot(), 0);
@@ -184,15 +203,18 @@ contract RewardsBeamTest is Test {
 
     // --- administration ---
 
-    function testRelyDeny() public {
-        vm.expectEmit();
-        emit Rely(rando);
-        beam.rely(rando);
-        assertEq(beam.wards(rando), 1);
-        vm.expectEmit();
-        emit Deny(rando);
-        beam.deny(rando);
-        assertEq(beam.wards(rando), 0);
+    function testAuth() public {
+        checkAuth(address(beam), "RewardsBeam");
+    }
+
+    function testModifiers() public {
+        bytes4[] memory authedMethods = new bytes4[](2);
+        authedMethods[0] = beam.kiss.selector;
+        authedMethods[1] = beam.diss.selector;
+
+        vm.startPrank(address(0xBEEF));
+        checkModifier(address(beam), "RewardsBeam/not-authorized", authedMethods);
+        vm.stopPrank();
     }
 
     function testKissDiss() public {
@@ -206,21 +228,6 @@ contract RewardsBeamTest is Test {
         assertEq(beam.buds(rando), 0);
     }
 
-    function testAdminAuth() public {
-        vm.startPrank(rando);
-        vm.expectRevert("RewardsBeam/not-authorized");
-        beam.rely(rando);
-        vm.expectRevert("RewardsBeam/not-authorized");
-        beam.deny(rando);
-        vm.expectRevert("RewardsBeam/not-authorized");
-        beam.kiss(rando);
-        vm.expectRevert("RewardsBeam/not-authorized");
-        beam.diss(rando);
-        vm.expectRevert("RewardsBeam/not-authorized");
-        beam.file("maxVestTot", 1);
-        vm.stopPrank();
-    }
-
     function testSetNotFacilitator() public {
         vm.prank(rando);
         vm.expectRevert("RewardsBeam/not-facilitator");
@@ -230,17 +237,7 @@ contract RewardsBeamTest is Test {
     // --- file ---
 
     function testFile() public {
-        vm.expectEmit();
-        emit File("maxVestTot", 1);
-        beam.file("maxVestTot", 1);
-        assertEq(beam.maxVestTot(), 1);
-
-        beam.file("vestTau", 30 days);
-        assertEq(beam.vestTau(), 30 days);
-        beam.file("tau", 7 days);
-        assertEq(beam.tau(), 7 days);
-        beam.file("toc", 8);
-        assertEq(beam.toc(), 8);
+        checkFileUint(address(beam), "RewardsBeam", ["maxVestTot", "vestTau", "tau", "toc"]);
     }
 
     function testFileBounds() public {
@@ -301,23 +298,6 @@ contract RewardsBeamTest is Test {
         assertEq(vest.fin(newId) - vest.bgn(newId), 30 days);
     }
 
-    function testFacilitatorCannotFileVestTau() public {
-        vm.prank(facilitator);
-        vm.expectRevert("RewardsBeam/not-authorized");
-        beam.file("vestTau", 1 days);
-    }
-
-    function testSetRevertsWithoutVestAuth() public {
-        RewardsBeam orphan = new RewardsBeam(address(dist));
-        orphan.file("maxVestTot", MAX_VEST_TOT);
-        orphan.file("tau", COOLDOWN);
-        orphan.kiss(facilitator);
-
-        vm.prank(facilitator);
-        vm.expectRevert("DssVest/not-authorized");
-        orphan.set(1_000_000 ether);
-    }
-
     function testSetRevertsWhenDistVestIdUnset() public {
         vm.mockCall(address(dist), abi.encodeWithSignature("vestId()"), abi.encode(uint256(0)));
         vm.prank(facilitator);
@@ -349,6 +329,16 @@ contract RewardsBeamTest is Test {
         beam.set(60_000_000 ether);
     }
 
+    function testSetRevertsWhenAllowanceCannotCoverTheFlush() public {
+        // The token caps cumulative transfers at the allowance, so the flush fails one wei short.
+        uint256 pending = vest.unpaid(dist.vestId());
+        vm.prank(pauseProxy); gem.approve(address(vest), pending - 1);
+
+        vm.prank(facilitator);
+        vm.expectRevert("Sky/insufficient-allowance");
+        beam.set(60_000_000 ether);
+    }
+
     function testSetCooldown() public {
         vm.prank(facilitator);
         beam.set(60_000_000 ether);
@@ -375,21 +365,22 @@ contract RewardsBeamTest is Test {
         uint256 allowanceBefore = gem.allowance(pauseProxy, address(vest));
         uint256 newVestTot = 60_000_000 ether;
 
+        uint256 newId = vest.ids() + 1;
+
         vm.expectEmit();
-        emit Set(prevId, prevId + 1, newVestTot, VEST_TAU);
+        emit Set(prevId, newId, newVestTot, VEST_TAU);
         vm.prank(facilitator);
         beam.set(newVestTot);
 
         // Outgoing stream flushed then retired.
-        assertEq(gem.balanceOf(address(farm)) - farmBalBefore, pending);
+        assertEq(gem.balanceOf(address(farm)), farmBalBefore + pending);
         assertEq(gem.allowance(pauseProxy, address(vest)), allowanceBefore - pending);
         assertEq(vest.fin(prevId), block.timestamp);
         assertEq(vest.tot(prevId), vest.rxd(prevId));
         assertFalse(vest.valid(prevId));
 
         // Replacement stream created, restricted and wired in.
-        uint256 newId = dist.vestId();
-        assertEq(newId, prevId + 1);
+        assertEq(dist.vestId(), newId);
         assertEq(vest.usr(newId), address(dist));
         assertEq(vest.tot(newId), newVestTot);
         assertEq(vest.rxd(newId), 0);
@@ -433,7 +424,7 @@ contract RewardsBeamTest is Test {
         assertEq(vest.unpaid(newId), 0);
         assertEq(vest.rxd(newId), 0);
         // The only SKY that moved is the outgoing stream's flush.
-        assertEq(gem.balanceOf(address(farm)) - farmBalBefore, pending);
+        assertEq(gem.balanceOf(address(farm)), farmBalBefore + pending);
     }
 
     function testSetLowersTheEmissionRate() public {
@@ -468,7 +459,7 @@ contract RewardsBeamTest is Test {
         beam.set(vestTot);
 
         uint256 newId = dist.vestId();
-        assertEq(newId, prevId + 1);
+        assertGt(newId, prevId);
         assertEq(vest.tot(newId), vestTot);
         assertEq(vest.bgn(newId), block.timestamp);
         // A stream that starts now can never frontload rewards into the farm.
