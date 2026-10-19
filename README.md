@@ -7,6 +7,9 @@ routine that governance spells run today.
 
 ## `set(vestTot)`
 
+`set()` rolls over an existing stream; it never creates the first one. Governance must have created
+the initial stream and pointed `dist` at it (`dist.vestId() != 0`), otherwise the call reverts.
+
 One call performs the whole rollover atomically:
 
 1. flush whatever the outgoing stream still owes the farm (`dist.distribute()`),
