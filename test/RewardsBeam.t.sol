@@ -70,7 +70,7 @@ contract RewardsBeamTest is Test {
     address rando = address(0xDEAD);
 
     uint256 constant MAX_VEST_TOT = 150_000_000 ether;
-    uint256 constant VEST_TAU = 90 days;
+    uint256 constant VEST_TAU = 100 days;
     uint256 constant COOLDOWN = 7 days;
 
     event Rely(address indexed usr);
@@ -82,13 +82,6 @@ contract RewardsBeamTest is Test {
 
     function setUp() public {
         string memory rpc = vm.envOr("ETH_RPC_URL", string(""));
-        if (bytes(rpc).length == 0) {
-            // Locally, skip when no RPC is configured. In CI, fail loudly rather than
-            // reporting a green run that executed nothing.
-            require(!vm.envOr("CI", false), "RewardsBeamTest/ETH_RPC_URL-required-in-ci");
-            vm.skip(true);
-            return;
-        }
         vm.createSelectFork(rpc, FORK_BLOCK);
 
         pauseProxy = chainlog.getAddress("MCD_PAUSE_PROXY");
@@ -115,14 +108,14 @@ contract RewardsBeamTest is Test {
 
     function testConstructor() public {
         vm.expectEmit();
-        emit File("vestTau", VEST_TAU);
+        emit File("vestTau", 90 days);
         vm.expectEmit();
         emit Rely(address(this));
         RewardsBeam beam_ = new RewardsBeam(address(dist));
 
         assertEq(address(beam_.dist()), address(dist));
         assertEq(address(beam_.vest()), address(vest));
-        assertEq(beam_.vestTau(), VEST_TAU);
+        assertEq(beam_.vestTau(), 90 days);
         assertEq(beam_.wards(address(this)), 1);
     }
 
@@ -179,7 +172,7 @@ contract RewardsBeamTest is Test {
     function testFreshBeamIsInert() public {
         RewardsBeam fresh = new RewardsBeam(address(dist));
         assertEq(fresh.maxVestTot(), 0);
-        assertEq(fresh.vestTau(), VEST_TAU);
+        assertEq(fresh.vestTau(), 90 days);
         assertEq(fresh.tau(), 0);
         assertEq(fresh.toc(), 0);
 
