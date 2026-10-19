@@ -35,10 +35,7 @@ interface DssVestLike {
 /// @notice Lets a facilitator multisig re-rate the vesting stream that funds a treasury-funded farm,
 ///         within boundaries set by Sky governance. It is the on-chain equivalent of the
 ///         `TreasuryFundedFarmingInit.updateFarmVest` routine used in governance spells.
-/// @dev    Governance is expected to `rely` this contract on both `vest` and `dist`, and to keep the
-///         treasury funded and its rewards-token allowance to `vest` topped up. `maxVestTot` is the
-///         beam's own boundary; that allowance independently caps the cumulative amount that can ever
-///         be transferred out, enforced by the token on each distribution.
+/// @dev    Governance is expected to `rely` this contract on both `vest` and `dist`. See README.md.
 contract RewardsBeam {
     // --- storage variables ---
 
@@ -129,28 +126,6 @@ contract RewardsBeam {
 
     // --- execution ---
 
-    // Notes:
-    // - It is intended to rewrite the same values, emit the event, and reset the toc count, even if `vestTot` is
-    //   unchanged: the stream will restart for a new `vestTau` period.
-    // - A fresh beam is inert: maxVestTot defaults to 0, so governance must file the boundary before a
-    //   facilitator can do anything.
-    // - The facilitator sets one number: how much to stream. The duration is `vestTau`, which only governance can
-    //   file, so the emission rate a facilitator can reach is bounded by maxVestTot / vestTau and both ends of that
-    //   are governance-owned. Lowering `vestTot` is unbounded; at worst it starves the farm, which governance can
-    //   revive, and the funds simply stay in the treasury.
-    // - The new stream always begins at `block.timestamp`, as every spell that ran this routine did. Keeping it
-    //   hardcoded removes the only knob a facilitator could have used to shift emissions in time: a `bgn` in the
-    //   past would make part of the stream claimable on creation and drop it into the farm at once, and a `bgn`
-    //   in the future would stall emissions until it arrives.
-    // - The treasury allowance to `vest` is neither raised nor checked here. The beam is not the treasury and
-    //   cannot approve on its behalf, and a pre-flight check would be worth little: the allowance is a
-    //   bookkeeping figure that the treasury balance does not necessarily back, `DssVest` draws `unpaid`
-    //   progressively rather than `vestTot` at once, and the token already caps cumulative transfers on its own.
-    //   The funding check that matters happens for free: the flush below moves real tokens, so `set()` reverts
-    //   if the treasury cannot cover what is currently due. Keeping the stream payable from there on is
-    //   governance's job, exactly as it is when the treasury balance runs low.
-    // - The farm's `rewardsDuration` is deliberately left out of the knobs: re-rating the notification window is
-    //   a more structural decision, better routed through the full governance process.
     function set(uint256 vestTot) external toll {
         uint256 vestTau_ = vestTau;
 
@@ -167,8 +142,7 @@ contract RewardsBeam {
         }
         vest.yank(prevVestId);
 
-        // Note: no distribution follows. The stream begins now, so nothing has accrued yet and
-        // `vest.unpaid(vestId)` is necessarily 0; the distribution job picks it up from here.
+        // Begins now, so nothing has accrued yet: the distribution job picks it up from here.
         uint256 vestId = vest.create(address(dist), vestTot, block.timestamp, vestTau_, 0, address(0));
         vest.restrict(vestId);
         dist.file("vestId", vestId);

@@ -17,6 +17,9 @@ One call performs the whole rollover atomically:
 3. create the replacement stream, beginning now, and restrict it (`vest.create` + `vest.restrict`),
 4. point the distribution contract at it (`dist.file("vestId", …)`).
 
+Every call restarts the stream for a full `vestTau` and resets the cooldown, even if `vestTot` is
+unchanged.
+
 Stakers do not see a rate jump: the farm blends each distribution with what is left of its current
 period, so its reward rate eases toward the new stream's over roughly one `rewardsDuration`.
 
