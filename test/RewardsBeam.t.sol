@@ -14,7 +14,7 @@ interface WardsLike {
     function wards(address) external view returns (uint256);
 }
 
-interface DssVestLike {
+interface DssVestTransferrableLike {
     function ids() external view returns (uint256);
     function TWENTY_YEARS() external view returns (uint256);
     function rely(address) external;
@@ -58,7 +58,7 @@ contract RewardsBeamTest is DssTest {
     ChainlogLike constant chainlog = ChainlogLike(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
     uint256 constant FORK_BLOCK = 25_920_000;
 
-    DssVestLike vest;
+    DssVestTransferrableLike vest;
     DistLike dist;
     FarmLike farm;
     GemLike gem;
@@ -84,7 +84,7 @@ contract RewardsBeamTest is DssTest {
 
         pauseProxy = chainlog.getAddress("MCD_PAUSE_PROXY");
         dist = DistLike(chainlog.getAddress("REWARDS_DIST_LSSKY_SKY"));
-        vest = DssVestLike(chainlog.getAddress("MCD_VEST_SKY_TREASURY"));
+        vest = DssVestTransferrableLike(chainlog.getAddress("MCD_VEST_SKY_TREASURY"));
         farm = FarmLike(chainlog.getAddress("REWARDS_LSSKY_SKY"));
         gem = GemLike(chainlog.getAddress("SKY"));
 
@@ -176,7 +176,28 @@ contract RewardsBeamTest is DssTest {
     }
 
     function init(address beam_, RewardsBeamConfig memory cfg) external {
+        vm.startPrank(pauseProxy);
         RewardsBeamInit.init(beam_, cfg);
+        vm.stopPrank();
+    }
+
+    function testInitRevertsWhenTocNotZero() public {
+        vm.startPrank(DEPLOYER);
+        address beam_ = RewardsBeamDeploy.deploy(DEPLOYER, pauseProxy, address(dist));
+        vm.stopPrank();
+        vm.prank(pauseProxy); RewardsBeam(beam_).file("toc", 1);
+
+        RewardsBeamConfig memory cfg = RewardsBeamConfig({
+            dist:        address(dist),
+            buds:        _buds(),
+            maxVestTot:  MAX_VEST_TOT,
+            vestTau:     VEST_TAU,
+            tau:         COOLDOWN,
+            allowance:   0,
+            key:         "REWARDS_BEAM_LSSKY_SKY"
+        });
+        vm.expectRevert("RewardsBeamInit/toc-not-zero");
+        this.init(beam_, cfg);
     }
 
     function testInitRevertsOnDistMismatch() public {
@@ -194,6 +215,45 @@ contract RewardsBeamTest is DssTest {
             key:         "REWARDS_BEAM_LSSKY_SKY"
         });
         vm.expectRevert("RewardsBeamInit/dist-mismatch");
+        this.init(beam_, cfg);
+    }
+
+    function testInitRevertsWhenDistVestIdUnset() public {
+        vm.startPrank(DEPLOYER);
+        address beam_ = RewardsBeamDeploy.deploy(DEPLOYER, pauseProxy, address(dist));
+        vm.stopPrank();
+
+        RewardsBeamConfig memory cfg = RewardsBeamConfig({
+            dist:        address(dist),
+            buds:        _buds(),
+            maxVestTot:  MAX_VEST_TOT,
+            vestTau:     VEST_TAU,
+            tau:         COOLDOWN,
+            allowance:   0,
+            key:         "REWARDS_BEAM_LSSKY_SKY"
+        });
+        vm.mockCall(address(dist), abi.encodeWithSignature("vestId()"), abi.encode(uint256(0)));
+        vm.expectRevert("RewardsBeamInit/dist-vest-id-not-set");
+        this.init(beam_, cfg);
+    }
+
+    function testInitRevertsOnVestCzarMismatch() public {
+        vm.startPrank(DEPLOYER);
+        address beam_ = RewardsBeamDeploy.deploy(DEPLOYER, pauseProxy, address(dist));
+        vm.stopPrank();
+
+        RewardsBeamConfig memory cfg = RewardsBeamConfig({
+            dist:        address(dist),
+            buds:        _buds(),
+            maxVestTot:  MAX_VEST_TOT,
+            vestTau:     VEST_TAU,
+            tau:         COOLDOWN,
+            allowance:   1,
+            key:         "REWARDS_BEAM_LSSKY_SKY"
+        });
+        // Pretend the vest pulls from a treasury other than the pause proxy.
+        vm.mockCall(address(vest), abi.encodeWithSignature("czar()"), abi.encode(rando));
+        vm.expectRevert("RewardsBeamInit/vest-czar-mismatch");
         this.init(beam_, cfg);
     }
 

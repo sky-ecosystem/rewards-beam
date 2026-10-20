@@ -17,11 +17,13 @@
 pragma solidity >=0.8.0;
 
 interface ChainlogLike {
+    function getAddress(bytes32) external view returns (address);
     function setAddress(bytes32, address) external;
 }
 
 interface RewardsBeamLike {
     function dist() external view returns (address);
+    function toc() external view returns (uint128);
     function file(bytes32, uint256) external;
     function kiss(address) external;
 }
@@ -29,10 +31,12 @@ interface RewardsBeamLike {
 interface VestedRewardsDistributionLike {
     function dssVest() external view returns (address);
     function gem() external view returns (address);
+    function vestId() external view returns (uint256);
     function rely(address) external;
 }
 
 interface DssVestLike {
+    function czar() external view returns (address);
     function rely(address) external;
 }
 
@@ -64,7 +68,9 @@ library RewardsBeamInit {
 
         // --- Sanity checks ---
 
+        require(beam.toc() == 0,              "RewardsBeamInit/toc-not-zero");
         require(beam.dist() == address(dist), "RewardsBeamInit/dist-mismatch");
+        require(dist.vestId() != 0,           "RewardsBeamInit/dist-vest-id-not-set");
 
         // --- Set permissions ---
 
@@ -75,8 +81,9 @@ library RewardsBeamInit {
 
         // --- Treasury allowance ---
 
+        // It assumed, that excepting a rare case, a DssVestTransferrable will be used, then allowance is needed
         if (cfg.allowance > 0) {
-            // It assumes vest.czar() == address(this) (pauseProxy)
+            require(vest.czar() == chainlog.getAddress("MCD_PAUSE_PROXY"), "RewardsBeamInit/vest-czar-mismatch");
             GemLike(dist.gem()).approve(address(vest), cfg.allowance);
         }
 
