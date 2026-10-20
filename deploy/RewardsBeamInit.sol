@@ -16,7 +16,9 @@
 
 pragma solidity >=0.8.0;
 
-import { DssInstance } from "dss-test/MCD.sol";
+interface ChainlogLike {
+    function setAddress(bytes32, address) external;
+}
 
 interface RewardsBeamLike {
     function dist() external view returns (address);
@@ -50,8 +52,9 @@ struct RewardsBeamConfig {
 
 library RewardsBeamInit {
 
+    ChainlogLike constant internal chainlog = ChainlogLike(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
+
     function init(
-        DssInstance       memory dss,
         address                  beam_,
         RewardsBeamConfig memory cfg
     ) internal {
@@ -88,6 +91,6 @@ library RewardsBeamInit {
 
         // --- Chainlog ---
 
-        dss.chainlog.setAddress(cfg.key, address(beam));
+        chainlog.setAddress(cfg.key, address(beam));
     }
 }

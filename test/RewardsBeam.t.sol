@@ -138,7 +138,7 @@ contract RewardsBeamTest is DssTest {
             key:         "REWARDS_BEAM_LSSKY_SKY"
         });
         vm.startPrank(pauseProxy);
-        RewardsBeamInit.init(MCD.loadFromChainlog(address(chainlog)), beam_, cfg);
+        RewardsBeamInit.init(beam_, cfg);
         vm.stopPrank();
 
         assertEq(RewardsBeam(beam_).wards(DEPLOYER), 0);
@@ -175,7 +175,7 @@ contract RewardsBeamTest is DssTest {
     }
 
     function init(address beam_, RewardsBeamConfig memory cfg) external {
-        RewardsBeamInit.init(MCD.loadFromChainlog(address(chainlog)), beam_, cfg);
+        RewardsBeamInit.init(beam_, cfg);
     }
 
     function testInitRevertsOnDistMismatch() public {
