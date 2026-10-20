@@ -106,14 +106,15 @@ contract RewardsBeamTest is DssTest {
 
     function testConstructor() public {
         vm.expectEmit();
-        emit File("vestTau", 90 days);
-        vm.expectEmit();
         emit Rely(address(this));
         RewardsBeam beam_ = new RewardsBeam(address(dist));
 
         assertEq(address(beam_.dist()), address(dist));
         assertEq(address(beam_.vest()), address(vest));
-        assertEq(beam_.vestTau(), 90 days);
+        assertEq(beam_.maxVestTot(), 0);
+        assertEq(beam_.vestTau(), 0);
+        assertEq(beam_.tau(), 0);
+        assertEq(beam_.toc(), 0);
         assertEq(beam_.wards(address(this)), 1);
     }
 
@@ -199,7 +200,7 @@ contract RewardsBeamTest is DssTest {
     function testFreshBeamIsInert() public {
         RewardsBeam fresh = new RewardsBeam(address(dist));
         assertEq(fresh.maxVestTot(), 0);
-        assertEq(fresh.vestTau(), 90 days);
+        assertEq(fresh.vestTau(), 0);
         assertEq(fresh.tau(), 0);
         assertEq(fresh.toc(), 0);
 

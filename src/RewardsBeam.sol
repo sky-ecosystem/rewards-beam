@@ -77,9 +77,6 @@ contract RewardsBeam {
     constructor(address _dist) {
         dist = VestedRewardsDistributionLike(_dist);
         vest = DssVestLike(dist.dssVest());
-        vestTau = 90 days;
-        emit File("vestTau", 90 days);
-
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
     }

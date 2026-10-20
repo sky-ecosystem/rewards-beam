@@ -31,7 +31,7 @@ nothing can be executed until governance files it.
 | Param        | Unit    | Description                                                |
 | ------------ | ------- | ---------------------------------------------------------- |
 | `maxVestTot` | wad     | max total of a new stream                                   |
-| `vestTau`    | s       | duration of a new stream; must be non-zero, defaults to `90 days` |
+| `vestTau`    | s       | duration of a new stream; between 1 second and 20 years     |
 | `tau`        | s       | cooldown between `set()` calls                              |
 | `toc`        | unix ts | last `set()` timestamp                                      |
 
