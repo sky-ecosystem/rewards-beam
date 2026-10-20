@@ -81,7 +81,9 @@ library RewardsBeamInit {
 
         // --- Treasury allowance ---
 
-        // It assumed, that excepting a rare case, a DssVestTransferrable will be used, then allowance is needed
+        // It assumes, that excepting a rare case, a DssVestTransferrable is being used, then allowance is needed.
+        // Also, that the value here will cover all future beam creation/changes (along with the other streams)
+        // or otherwise will be adjusted separately later.
         if (cfg.allowance > 0) {
             require(vest.czar() == chainlog.getAddress("MCD_PAUSE_PROXY"), "RewardsBeamInit/vest-czar-mismatch");
             GemLike(dist.gem()).approve(address(vest), cfg.allowance);
