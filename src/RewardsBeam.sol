@@ -41,7 +41,7 @@ contract RewardsBeam {
 
     mapping(address => uint256) public wards;
     mapping(address => uint256) public buds;
-    uint256 public maxVestTot; // [wad]     Maximum allowed total amount of a new vesting stream
+    uint256 public maxVestTot; // [token decimals precision] Maximum allowed total amount of a new vesting stream
     uint256 public vestTau;    // [seconds] Duration of a new vesting stream
     uint64  public tau;        // Cooldown period between set() calls in seconds
     uint128 public toc;        // Last time when set() was called (Unix timestamp)
@@ -141,8 +141,8 @@ contract RewardsBeam {
 
         // Begins now (`bgn` is now and `eta` is 0, so no cliff), so nothing has accrued yet:
         // the distribution job picks it up from here.
-        // No manager (`mgr` is address(0)): its `yank` would be pointless here, since a bud
-        // can start a new stream with the next `set()`.
+        // Note that if the initial Vest (attached to the dist by Governance) had a manager defined, the
+        // call to this function will overwrite it with a new vest that will have address(0) as that value
         uint256 vestId = vest.create(address(dist), vestTot, block.timestamp, vestTau_, 0, address(0));
         vest.restrict(vestId);
         dist.file("vestId", vestId);
