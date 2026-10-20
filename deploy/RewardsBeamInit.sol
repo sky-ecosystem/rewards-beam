@@ -39,13 +39,13 @@ interface GemLike {
 }
 
 struct RewardsBeamConfig {
-    address dist;
-    address facilitator;
-    uint256 maxVestTot;
-    uint256 vestTau;
-    uint256 tau;
-    uint256 allowance; // [wad] Treasury's gem allowance to a transferrable vest; 0 to skip
-    bytes32 key;
+    address   dist;
+    address[] buds;      // Facilitators allowed to call `set()`
+    uint256   maxVestTot;
+    uint256   vestTau;
+    uint256   tau;
+    uint256   allowance; // [wad] Treasury's gem allowance to a transferrable vest; 0 to skip
+    bytes32   key;
 }
 
 library RewardsBeamInit {
@@ -82,7 +82,9 @@ library RewardsBeamInit {
         beam.file("maxVestTot", cfg.maxVestTot);
         beam.file("vestTau",    cfg.vestTau);
         beam.file("tau",        cfg.tau);
-        beam.kiss(cfg.facilitator);
+        for (uint256 i; i < cfg.buds.length; i++) {
+            beam.kiss(cfg.buds[i]);
+        }
 
         // --- Chainlog ---
 

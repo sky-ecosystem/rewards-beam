@@ -67,6 +67,6 @@ A governance `yank` of the current stream does not, by itself, stop the beam: th
 create a fresh stream and reactivate the farm. When governance retires the stream, it should disable
 the beam in the same spell, by any of:
 
-- `diss` the facilitator, so no one can call `set()`;
+- `diss` every facilitator, so no one can call `set()`;
 - `file("maxVestTot", 0)`, so no non-zero stream fits (and `vest.create` rejects a zero one);
 - `deny` the beam on `vest` or on `dist`, so the rollover reverts.

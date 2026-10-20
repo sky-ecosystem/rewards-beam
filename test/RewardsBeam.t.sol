@@ -67,6 +67,7 @@ contract RewardsBeamTest is DssTest {
 
     address constant DEPLOYER = address(0xDE9);
     address facilitator = address(0xFAC1);
+    address facilitator2 = address(0xFAC2);
     address rando = address(0xDEAD);
 
     uint256 constant MAX_VEST_TOT = 150_000_000 ether;
@@ -116,6 +117,12 @@ contract RewardsBeamTest is DssTest {
         assertEq(beam_.wards(address(this)), 1);
     }
 
+    function _buds() internal view returns (address[] memory buds) {
+        buds = new address[](2);
+        buds[0] = facilitator;
+        buds[1] = facilitator2;
+    }
+
     function _deployAndInit(uint256 allowance) internal returns (address beam_) {
         vm.startPrank(DEPLOYER);
         beam_ = RewardsBeamDeploy.deploy(DEPLOYER, pauseProxy, address(dist));
@@ -123,7 +130,7 @@ contract RewardsBeamTest is DssTest {
 
         RewardsBeamConfig memory cfg = RewardsBeamConfig({
             dist:        address(dist),
-            facilitator: facilitator,
+            buds:        _buds(),
             maxVestTot:  MAX_VEST_TOT,
             vestTau:     VEST_TAU,
             tau:         COOLDOWN,
@@ -142,6 +149,7 @@ contract RewardsBeamTest is DssTest {
         assertEq(RewardsBeam(beam_).vestTau(), VEST_TAU);
         assertEq(RewardsBeam(beam_).tau(), COOLDOWN);
         assertEq(RewardsBeam(beam_).buds(facilitator), 1);
+        assertEq(RewardsBeam(beam_).buds(facilitator2), 1);
         assertEq(chainlog.getAddress("REWARDS_BEAM_LSSKY_SKY"), beam_);
     }
 
@@ -177,7 +185,7 @@ contract RewardsBeamTest is DssTest {
 
         RewardsBeamConfig memory cfg = RewardsBeamConfig({
             dist:        chainlog.getAddress("REWARDS_DIST_USDS_SKY"),
-            facilitator: facilitator,
+            buds:        _buds(),
             maxVestTot:  MAX_VEST_TOT,
             vestTau:     VEST_TAU,
             tau:         COOLDOWN,
