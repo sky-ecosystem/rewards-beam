@@ -50,7 +50,7 @@ struct RewardsBeamConfig {
     uint256   maxVestTot;
     uint256   vestTau;
     uint256   tau;
-    uint256   allowance; // [wad] Treasury's gem allowance to a transferrable vest; 0 to skip
+    uint256   allowance; // [token decimals precision] Treasury's gem allowance to a transferrable vest; 0 to skip
     bytes32   key;
 }
 
