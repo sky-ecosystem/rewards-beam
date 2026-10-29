@@ -103,10 +103,11 @@ contract RewardsBeamMom {
     // --- Emergency functions ---
 
     // Disables the beam, so no facilitator can start a new stream, and yanks the current one.
+    // The beam is disabled by filing an unreachable cooldown.
     // The yank keeps what has accrued so far claimable, so the farm still receives it on the next distribution.
     // Repeated calls do not revert: yanking a stream that already ended is a no-op.
     function stop() external auth {
-        beam.file("maxVestTot", 0);
+        beam.file("tau", type(uint64).max);
 
         uint256 vestId = dist.vestId();
         if (vestId != 0) {

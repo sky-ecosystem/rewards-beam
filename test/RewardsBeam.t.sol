@@ -569,7 +569,7 @@ contract RewardsBeamTest is DssTest {
         vm.prank(pauseProxy);
         mom.stop();
 
-        assertEq(beam.maxVestTot(), 0);
+        assertEq(beam.tau(), type(uint64).max);
         assertEq(vest.fin(dist.vestId()), block.timestamp);
     }
 
@@ -583,17 +583,14 @@ contract RewardsBeamTest is DssTest {
         mom.stop();
 
         // The beam is disabled and the running stream ends now.
-        assertEq(beam.maxVestTot(), 0);
+        assertEq(beam.tau(), type(uint64).max);
         assertEq(vest.fin(vestId), block.timestamp);
 
-        // No facilitator can start a new stream afterwards, not even past the cooldown.
-        vm.warp(block.timestamp + COOLDOWN);
-        vm.startPrank(facilitator);
-        vm.expectRevert("RewardsBeam/vestTot-above-max");
+        // No facilitator can start a new stream afterwards, however long they wait.
+        vm.warp(block.timestamp + 100 * 365 days);
+        vm.prank(facilitator);
+        vm.expectRevert("RewardsBeam/too-early");
         beam.set(1);
-        vm.expectRevert("DssVest/no-vest-total-amount");
-        beam.set(0);
-        vm.stopPrank();
     }
 
     function testMomStopKeepsAccruedClaimable() public {
@@ -623,6 +620,6 @@ contract RewardsBeamTest is DssTest {
         mom.stop();
         vm.clearMockedCalls();
 
-        assertEq(beam.maxVestTot(), 0);
+        assertEq(beam.tau(), type(uint64).max);
     }
 }
