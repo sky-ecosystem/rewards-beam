@@ -70,3 +70,6 @@ the beam in the same spell, by any of:
 - `diss` every facilitator, so no one can call `set()`;
 - `file("maxVestTot", 0)`, so no non-zero stream fits (and `vest.create` rejects a zero one);
 - `deny` the beam on `vest` or on `dist`, so the rollover reverts.
+
+`RewardsBeamMom` does both without the governance delay: `stop()` files `maxVestTot` to `0` and yanks
+the current stream. What has accrued until then stays claimable, so the farm still receives it.

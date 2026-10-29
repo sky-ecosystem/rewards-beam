@@ -3,11 +3,17 @@ pragma solidity ^0.8.24;
 
 import "dss-test/DssTest.sol";
 import {RewardsBeam} from "../src/RewardsBeam.sol";
+import {RewardsBeamMom} from "../src/RewardsBeamMom.sol";
+import {RewardsBeamInstance} from "../deploy/RewardsBeamInstance.sol";
 import {RewardsBeamDeploy} from "../deploy/RewardsBeamDeploy.sol";
 import {RewardsBeamInit, RewardsBeamConfig} from "../deploy/RewardsBeamInit.sol";
 
 interface ChainlogLike {
     function getAddress(bytes32) external view returns (address);
+}
+
+interface ChiefLike {
+    function hat() external view returns (address);
 }
 
 interface WardsLike {
@@ -64,6 +70,7 @@ contract RewardsBeamTest is DssTest {
     GemLike gem;
     address pauseProxy;
     RewardsBeam beam;
+    RewardsBeamMom mom;
 
     address constant DEPLOYER = address(0xDE9);
     address facilitator = address(0xFAC1);
@@ -96,7 +103,9 @@ contract RewardsBeamTest is DssTest {
         assertEq(farm.rewardsDistribution(), address(dist));
 
         // Leave the treasury allowance as deployed; tests that need more set it themselves.
-        beam = RewardsBeam(_deployAndInit(0));
+        RewardsBeamInstance memory instance = _deployAndInit(0);
+        beam = RewardsBeam(instance.beam);
+        mom  = RewardsBeamMom(instance.mom);
 
         // Let the test contract act as governance on the beam directly.
         vm.prank(pauseProxy); beam.rely(address(this));
@@ -124,43 +133,65 @@ contract RewardsBeamTest is DssTest {
         buds[1] = facilitator2;
     }
 
-    function _deployAndInit(uint256 allowance) internal returns (address beam_) {
-        vm.startPrank(DEPLOYER);
-        beam_ = RewardsBeamDeploy.deploy(DEPLOYER, pauseProxy, address(dist));
-        vm.stopPrank();
-
-        RewardsBeamConfig memory cfg = RewardsBeamConfig({
+    function _cfg(uint256 allowance) internal view returns (RewardsBeamConfig memory) {
+        return RewardsBeamConfig({
             dist:        address(dist),
             buds:        _buds(),
             maxVestTot:  MAX_VEST_TOT,
             vestTau:     VEST_TAU,
             tau:         COOLDOWN,
             allowance:   allowance,
-            key:         "REWARDS_BEAM_LSSKY_SKY"
+            beamKey:     "REWARDS_BEAM_LSSKY_SKY",
+            momKey:      "REWARDS_BEAM_LSSKY_SKY_MOM"
         });
+    }
+
+    function _deploy() internal returns (RewardsBeamInstance memory instance) {
+        vm.startPrank(DEPLOYER);
+        instance = RewardsBeamDeploy.deploy(DEPLOYER, pauseProxy, address(dist));
+        vm.stopPrank();
+    }
+
+    function _deployAndInit(uint256 allowance) internal returns (RewardsBeamInstance memory instance) {
+        instance = _deploy();
+        assertEq(RewardsBeam(instance.beam).wards(DEPLOYER), 0);
+        assertEq(RewardsBeam(instance.beam).wards(pauseProxy), 1);
+        assertEq(RewardsBeamMom(instance.mom).owner(), pauseProxy);
+
         vm.startPrank(pauseProxy);
-        RewardsBeamInit.init(beam_, cfg);
+        RewardsBeamInit.init(instance, _cfg(allowance));
         vm.stopPrank();
 
-        assertEq(RewardsBeam(beam_).wards(DEPLOYER), 0);
-        assertEq(RewardsBeam(beam_).wards(pauseProxy), 1);
-        assertEq(WardsLike(address(vest)).wards(beam_), 1);
-        assertEq(WardsLike(address(dist)).wards(beam_), 1);
-        assertEq(RewardsBeam(beam_).maxVestTot(), MAX_VEST_TOT);
-        assertEq(RewardsBeam(beam_).vestTau(), VEST_TAU);
-        assertEq(RewardsBeam(beam_).tau(), COOLDOWN);
-        assertEq(RewardsBeam(beam_).buds(facilitator), 1);
-        assertEq(RewardsBeam(beam_).buds(facilitator2), 1);
-        assertEq(chainlog.getAddress("REWARDS_BEAM_LSSKY_SKY"), beam_);
+        RewardsBeam    beam_ = RewardsBeam(instance.beam);
+        RewardsBeamMom mom_  = RewardsBeamMom(instance.mom);
+
+        // Beam
+        assertEq(WardsLike(address(vest)).wards(address(beam_)), 1);
+        assertEq(WardsLike(address(dist)).wards(address(beam_)), 1);
+        assertEq(beam_.maxVestTot(), MAX_VEST_TOT);
+        assertEq(beam_.vestTau(), VEST_TAU);
+        assertEq(beam_.tau(), COOLDOWN);
+        assertEq(beam_.buds(facilitator), 1);
+        assertEq(beam_.buds(facilitator2), 1);
+        assertEq(chainlog.getAddress("REWARDS_BEAM_LSSKY_SKY"), address(beam_));
+
+        // Mom
+        assertEq(address(mom_.beam()), address(beam_));
+        assertEq(address(mom_.dist()), address(dist));
+        assertEq(address(mom_.vest()), address(vest));
+        assertEq(mom_.authority(), chainlog.getAddress("MCD_ADM"));
+        assertEq(beam_.wards(address(mom_)), 1);
+        assertEq(WardsLike(address(vest)).wards(address(mom_)), 1);
+        assertEq(chainlog.getAddress("REWARDS_BEAM_LSSKY_SKY_MOM"), address(mom_));
     }
 
     function testDeployAndInit() public {
-        address beam_ = _deployAndInit(300_000_000 ether);
+        RewardsBeamInstance memory instance = _deployAndInit(300_000_000 ether);
         assertEq(gem.allowance(pauseProxy, address(vest)), 300_000_000 ether);
 
         // The initialized beam is live.
         vm.prank(facilitator);
-        RewardsBeam(beam_).set(10_000_000 ether);
+        RewardsBeam(instance.beam).set(10_000_000 ether);
         assertEq(vest.tot(dist.vestId()), 10_000_000 ether);
     }
 
@@ -175,86 +206,53 @@ contract RewardsBeamTest is DssTest {
         assertEq(gem.allowance(pauseProxy, address(vest)), type(uint256).max);
     }
 
-    function init(address beam_, RewardsBeamConfig memory cfg) external {
+    function init(RewardsBeamInstance memory instance, RewardsBeamConfig memory cfg) external {
         vm.startPrank(pauseProxy);
-        RewardsBeamInit.init(beam_, cfg);
+        RewardsBeamInit.init(instance, cfg);
         vm.stopPrank();
     }
 
     function testInitRevertsWhenTocNotZero() public {
-        vm.startPrank(DEPLOYER);
-        address beam_ = RewardsBeamDeploy.deploy(DEPLOYER, pauseProxy, address(dist));
-        vm.stopPrank();
-        vm.prank(pauseProxy); RewardsBeam(beam_).file("toc", 1);
+        RewardsBeamInstance memory instance = _deploy();
+        vm.prank(pauseProxy); RewardsBeam(instance.beam).file("toc", 1);
 
-        RewardsBeamConfig memory cfg = RewardsBeamConfig({
-            dist:        address(dist),
-            buds:        _buds(),
-            maxVestTot:  MAX_VEST_TOT,
-            vestTau:     VEST_TAU,
-            tau:         COOLDOWN,
-            allowance:   0,
-            key:         "REWARDS_BEAM_LSSKY_SKY"
-        });
         vm.expectRevert("RewardsBeamInit/toc-not-zero");
-        this.init(beam_, cfg);
+        this.init(instance, _cfg(0));
     }
 
     function testInitRevertsOnDistMismatch() public {
-        vm.startPrank(DEPLOYER);
-        address beam_ = RewardsBeamDeploy.deploy(DEPLOYER, pauseProxy, address(dist));
-        vm.stopPrank();
+        RewardsBeamInstance memory instance = _deploy();
+        RewardsBeamConfig memory cfg = _cfg(0);
+        cfg.dist = chainlog.getAddress("REWARDS_DIST_USDS_SKY");
 
-        RewardsBeamConfig memory cfg = RewardsBeamConfig({
-            dist:        chainlog.getAddress("REWARDS_DIST_USDS_SKY"),
-            buds:        _buds(),
-            maxVestTot:  MAX_VEST_TOT,
-            vestTau:     VEST_TAU,
-            tau:         COOLDOWN,
-            allowance:   0,
-            key:         "REWARDS_BEAM_LSSKY_SKY"
-        });
         vm.expectRevert("RewardsBeamInit/dist-mismatch");
-        this.init(beam_, cfg);
+        this.init(instance, cfg);
     }
 
     function testInitRevertsWhenDistVestIdUnset() public {
-        vm.startPrank(DEPLOYER);
-        address beam_ = RewardsBeamDeploy.deploy(DEPLOYER, pauseProxy, address(dist));
-        vm.stopPrank();
+        RewardsBeamInstance memory instance = _deploy();
 
-        RewardsBeamConfig memory cfg = RewardsBeamConfig({
-            dist:        address(dist),
-            buds:        _buds(),
-            maxVestTot:  MAX_VEST_TOT,
-            vestTau:     VEST_TAU,
-            tau:         COOLDOWN,
-            allowance:   0,
-            key:         "REWARDS_BEAM_LSSKY_SKY"
-        });
         vm.mockCall(address(dist), abi.encodeWithSignature("vestId()"), abi.encode(uint256(0)));
         vm.expectRevert("RewardsBeamInit/dist-vest-id-not-set");
-        this.init(beam_, cfg);
+        this.init(instance, _cfg(0));
+    }
+
+    function testInitRevertsOnMomBeamMismatch() public {
+        RewardsBeamInstance memory instance = _deploy();
+        // A mom deployed for a different beam.
+        instance.mom = _deploy().mom;
+
+        vm.expectRevert("RewardsBeamInit/mom-beam-mismatch");
+        this.init(instance, _cfg(0));
     }
 
     function testInitRevertsOnVestCzarMismatch() public {
-        vm.startPrank(DEPLOYER);
-        address beam_ = RewardsBeamDeploy.deploy(DEPLOYER, pauseProxy, address(dist));
-        vm.stopPrank();
+        RewardsBeamInstance memory instance = _deploy();
 
-        RewardsBeamConfig memory cfg = RewardsBeamConfig({
-            dist:        address(dist),
-            buds:        _buds(),
-            maxVestTot:  MAX_VEST_TOT,
-            vestTau:     VEST_TAU,
-            tau:         COOLDOWN,
-            allowance:   1,
-            key:         "REWARDS_BEAM_LSSKY_SKY"
-        });
         // Pretend the vest pulls from a treasury other than the pause proxy.
         vm.mockCall(address(vest), abi.encodeWithSignature("czar()"), abi.encode(rando));
         vm.expectRevert("RewardsBeamInit/vest-czar-mismatch");
-        this.init(beam_, cfg);
+        this.init(instance, _cfg(1));
     }
 
     function testFreshBeamIsInert() public {
@@ -533,5 +531,98 @@ contract RewardsBeamTest is DssTest {
         assertEq(vest.bgn(newId), block.timestamp);
         // A stream that starts now can never frontload rewards into the farm.
         assertEq(vest.rxd(newId), 0);
+    }
+
+    // --- mom ---
+
+    event SetOwner(address indexed newOwner);
+    event SetAuthority(address indexed newAuthority);
+    event Stop(uint256 vestId);
+
+    function testMomSetOwnerAndAuthority() public {
+        vm.startPrank(rando);
+        vm.expectRevert("RewardsBeamMom/not-owner");
+        mom.setOwner(rando);
+        vm.expectRevert("RewardsBeamMom/not-owner");
+        mom.setAuthority(rando);
+        vm.stopPrank();
+
+        vm.startPrank(pauseProxy);
+        vm.expectEmit(address(mom));
+        emit SetAuthority(rando);
+        mom.setAuthority(rando);
+        assertEq(mom.authority(), rando);
+        vm.expectEmit(address(mom));
+        emit SetOwner(rando);
+        mom.setOwner(rando);
+        assertEq(mom.owner(), rando);
+        vm.stopPrank();
+    }
+
+    function testMomStopNotAuthorized() public {
+        vm.prank(rando);
+        vm.expectRevert("RewardsBeamMom/not-authorized");
+        mom.stop();
+    }
+
+    function testMomStopByOwner() public {
+        vm.prank(pauseProxy);
+        mom.stop();
+
+        assertEq(beam.maxVestTot(), 0);
+        assertEq(vest.fin(dist.vestId()), block.timestamp);
+    }
+
+    function testMomStopByHat() public {
+        uint256 vestId = dist.vestId();
+        assertGt(vest.fin(vestId), block.timestamp);
+
+        vm.expectEmit(address(mom));
+        emit Stop(vestId);
+        vm.prank(ChiefLike(chainlog.getAddress("MCD_ADM")).hat());
+        mom.stop();
+
+        // The beam is disabled and the running stream ends now.
+        assertEq(beam.maxVestTot(), 0);
+        assertEq(vest.fin(vestId), block.timestamp);
+
+        // No facilitator can start a new stream afterwards, not even past the cooldown.
+        vm.warp(block.timestamp + COOLDOWN);
+        vm.startPrank(facilitator);
+        vm.expectRevert("RewardsBeam/vestTot-above-max");
+        beam.set(1);
+        vm.expectRevert("DssVest/no-vest-total-amount");
+        beam.set(0);
+        vm.stopPrank();
+    }
+
+    function testMomStopKeepsAccruedClaimable() public {
+        uint256 vestId = dist.vestId();
+        uint256 pending = vest.unpaid(vestId);
+        assertGt(pending, 0, "fixture expects a live stream with pending rewards");
+        uint256 farmBalBefore = gem.balanceOf(address(farm));
+
+        vm.prank(pauseProxy);
+        mom.stop();
+
+        // What accrued before the stop still reaches the farm, and nothing accrues after it.
+        vm.warp(block.timestamp + 7 days);
+        assertEq(vest.unpaid(vestId), pending);
+        dist.distribute();
+        assertEq(gem.balanceOf(address(farm)), farmBalBefore + pending);
+        assertEq(vest.unpaid(vestId), 0);
+    }
+
+    function testMomStopWithoutVestId() public {
+        vm.mockCall(address(dist), abi.encodeWithSignature("vestId()"), abi.encode(uint256(0)));
+
+        // There is no stream to yank, but the beam is still disabled.
+        vm.expectEmit(address(mom));
+        emit Stop(0);
+        vm.prank(pauseProxy);
+        mom.stop();
+        vm.clearMockedCalls();
+
+        assertEq(beam.maxVestTot(), 0);
     }
 }
