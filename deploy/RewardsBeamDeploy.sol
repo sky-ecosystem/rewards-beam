@@ -17,16 +17,22 @@
 pragma solidity ^0.8.24;
 
 import { ScriptTools } from "dss-test/ScriptTools.sol";
+import { RewardsBeamInstance } from "./RewardsBeamInstance.sol";
 import { RewardsBeam } from "src/RewardsBeam.sol";
+import { RewardsBeamMom } from "src/RewardsBeamMom.sol";
 
+// Deploy a RewardsBeam instance
 library RewardsBeamDeploy {
 
     function deploy(
         address deployer,
         address owner,
         address dist
-    ) internal returns (address beam) {
-        beam = address(new RewardsBeam(dist));
-        ScriptTools.switchOwner(beam, deployer, owner);
+    ) internal returns (RewardsBeamInstance memory instance) {
+        instance.beam = address(new RewardsBeam(dist));
+        instance.mom  = address(new RewardsBeamMom(instance.beam));
+
+        ScriptTools.switchOwner(instance.beam, deployer, owner);
+        RewardsBeamMom(instance.mom).setOwner(owner);
     }
 }

@@ -28,12 +28,12 @@ spread together with the new rewards.
 Governance `file`s each knob. A freshly deployed beam is **inert**: `maxVestTot` defaults to `0`, so
 nothing can be executed until governance files it.
 
-| Param        | Unit    | Description                                                |
-| ------------ | ------- | ---------------------------------------------------------- |
-| `maxVestTot` | wad     | max total of a new stream                                   |
-| `vestTau`    | s       | duration of a new stream; between 1 second and 20 years     |
-| `tau`        | s       | cooldown between `set()` calls                              |
-| `toc`        | unix ts | last `set()` timestamp                                      |
+| Param        | Unit                     | Description                                             |
+| ------------ | ------------------------ | ------------------------------------------------------- |
+| `maxVestTot` | token decimals precision | max total of a new stream                               |
+| `vestTau`    | s                        | duration of a new stream; between 1 second and 20 years |
+| `tau`        | s                        | cooldown between `set()` calls                          |
+| `toc`        | unix ts                  | last `set()` timestamp                                  |
 
 The facilitator sets one number: how much to stream. `vestTau` is governance-only, so the rate a
 facilitator can reach is bounded by `maxVestTot / vestTau`, both ends governance-owned. Lowering
@@ -69,4 +69,9 @@ the beam in the same spell, by any of:
 
 - `diss` every facilitator, so no one can call `set()`;
 - `file("maxVestTot", 0)`, so no non-zero stream fits (and `vest.create` rejects a zero one);
+- `file("tau", type(uint64).max)` or `file("toc", type(uint128).max)` filing an unreachable cooldown
 - `deny` the beam on `vest` or on `dist`, so the rollover reverts.
+
+`RewardsBeamMom` does both without the governance delay: `stop()` files `tau` to `type(uint64).max`,
+an unreachable cooldown, and yanks the current stream. Reviving the beam is a matter of filing `tau`
+back. What has accrued until then stays claimable, so the farm still receives it.

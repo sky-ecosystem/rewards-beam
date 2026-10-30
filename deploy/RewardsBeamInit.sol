@@ -16,6 +16,8 @@
 
 pragma solidity >=0.8.0;
 
+import { RewardsBeamInstance } from "./RewardsBeamInstance.sol";
+
 interface ChainlogLike {
     function getAddress(bytes32) external view returns (address);
     function setAddress(bytes32, address) external;
@@ -26,6 +28,12 @@ interface RewardsBeamLike {
     function toc() external view returns (uint128);
     function file(bytes32, uint256) external;
     function kiss(address) external;
+    function rely(address) external;
+}
+
+interface RewardsBeamMomLike {
+    function beam() external view returns (address);
+    function setAuthority(address) external;
 }
 
 interface VestedRewardsDistributionLike {
@@ -51,7 +59,8 @@ struct RewardsBeamConfig {
     uint256   vestTau;
     uint256   tau;
     uint256   allowance; // [token decimals precision] Treasury's gem allowance to a transferrable vest; 0 to skip
-    bytes32   key;
+    bytes32   beamKey;
+    bytes32   momKey;
 }
 
 library RewardsBeamInit {
@@ -59,10 +68,11 @@ library RewardsBeamInit {
     ChainlogLike constant internal chainlog = ChainlogLike(0xdA0Ab1e0017DEbCd72Be8599041a2aa3bA7e740F);
 
     function init(
-        address                  beam_,
-        RewardsBeamConfig memory cfg
+        RewardsBeamInstance memory instance,
+        RewardsBeamConfig   memory cfg
     ) internal {
-        RewardsBeamLike               beam = RewardsBeamLike(beam_);
+        RewardsBeamLike               beam = RewardsBeamLike(instance.beam);
+        RewardsBeamMomLike            mom  = RewardsBeamMomLike(instance.mom);
         VestedRewardsDistributionLike dist = VestedRewardsDistributionLike(cfg.dist);
         DssVestLike                   vest = DssVestLike(dist.dssVest());
 
@@ -71,6 +81,7 @@ library RewardsBeamInit {
         require(beam.toc() == 0,              "RewardsBeamInit/toc-not-zero");
         require(beam.dist() == address(dist), "RewardsBeamInit/dist-mismatch");
         require(dist.vestId() != 0,           "RewardsBeamInit/dist-vest-id-not-set");
+        require(mom.beam() == address(beam),  "RewardsBeamInit/mom-beam-mismatch");
 
         // --- Set permissions ---
 
@@ -78,6 +89,10 @@ library RewardsBeamInit {
         vest.rely(address(beam));
         // Rely the beam on dist to file the new vestId
         dist.rely(address(beam));
+        // Rely the mom on the beam to file vestTau to type(uint64).max)
+        beam.rely(address(mom));
+        // Rely the mom on vest to yank the current stream
+        vest.rely(address(mom));
 
         // --- Treasury allowance ---
 
@@ -98,8 +113,14 @@ library RewardsBeamInit {
             beam.kiss(cfg.buds[i]);
         }
 
+        // --- Configure the mom ---
+
+        // Let the chief's hat call stop() without delay
+        mom.setAuthority(chainlog.getAddress("MCD_ADM"));
+
         // --- Chainlog ---
 
-        chainlog.setAddress(cfg.key, address(beam));
+        chainlog.setAddress(cfg.beamKey, address(beam));
+        chainlog.setAddress(cfg.momKey,  address(mom));
     }
 }
