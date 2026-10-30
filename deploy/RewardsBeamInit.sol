@@ -89,7 +89,7 @@ library RewardsBeamInit {
         vest.rely(address(beam));
         // Rely the beam on dist to file the new vestId
         dist.rely(address(beam));
-        // Rely the mom on the beam to file tau to type(uint64).max)
+        // Rely the mom on the beam to file tau to type(uint64).max
         beam.rely(address(mom));
         // Rely the mom on vest to yank the current stream
         vest.rely(address(mom));
