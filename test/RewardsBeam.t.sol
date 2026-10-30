@@ -539,6 +539,17 @@ contract RewardsBeamTest is DssTest {
     event SetAuthority(address indexed newAuthority);
     event Stop(uint256 vestId);
 
+    function testMomConstructor() public {
+        vm.expectEmit();
+        emit SetOwner(address(this));
+        RewardsBeamMom mom_ = new RewardsBeamMom(address(beam));
+        assertEq(address(mom_.beam()), address(beam));
+        assertEq(address(mom_.dist()), address(dist));
+        assertEq(address(mom_.vest()), address(vest));
+        assertEq(mom_.owner(),         address(this));
+        assertEq(mom_.authority(),     address(0));
+    }
+
     function testMomSetOwnerAndAuthority() public {
         vm.startPrank(rando);
         vm.expectRevert("RewardsBeamMom/not-owner");
@@ -560,9 +571,11 @@ contract RewardsBeamTest is DssTest {
     }
 
     function testMomStopNotAuthorized() public {
-        vm.prank(rando);
-        vm.expectRevert("RewardsBeamMom/not-authorized");
-        mom.stop();
+        checkModifier(address(mom), "RewardsBeamMom/not-authorized", [RewardsBeamMom.stop.selector]);
+
+        vm.prank(address(pauseProxy));
+        mom.setAuthority(address(0));
+        checkModifier(address(mom), "RewardsBeamMom/not-authorized", [RewardsBeamMom.stop.selector]);
     }
 
     function testMomStopByOwner() public {
