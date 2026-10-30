@@ -28,12 +28,12 @@ spread together with the new rewards.
 Governance `file`s each knob. A freshly deployed beam is **inert**: `maxVestTot` defaults to `0`, so
 nothing can be executed until governance files it.
 
-| Param        | Unit    | Description                                                |
-| ------------ | ------- | ---------------------------------------------------------- |
-| `maxVestTot` | wad     | max total of a new stream                                   |
-| `vestTau`    | s       | duration of a new stream; between 1 second and 20 years     |
-| `tau`        | s       | cooldown between `set()` calls                              |
-| `toc`        | unix ts | last `set()` timestamp                                      |
+| Param        | Unit                     | Description                                             |
+| ------------ | ------------------------ | ------------------------------------------------------- |
+| `maxVestTot` | token decimals precision | max total of a new stream                               |
+| `vestTau`    | s                        | duration of a new stream; between 1 second and 20 years |
+| `tau`        | s                        | cooldown between `set()` calls                          |
+| `toc`        | unix ts                  | last `set()` timestamp                                  |
 
 The facilitator sets one number: how much to stream. `vestTau` is governance-only, so the rate a
 facilitator can reach is bounded by `maxVestTot / vestTau`, both ends governance-owned. Lowering
