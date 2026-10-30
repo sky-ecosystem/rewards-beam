@@ -8,6 +8,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      matrix:
+        beam:
+          - beam
+          - mom
 
     steps:
       - name: Checkout
@@ -36,6 +40,6 @@ jobs:
         run: pip3 install certora-cli-beta
 
       - name: Verify ${{ matrix.beam }}
-        run: make certora-beam results=1
+        run: make certora-${{ matrix.beam }} results=1
         env:
           CERTORAKEY: ${{ secrets.CERTORAKEY }}
